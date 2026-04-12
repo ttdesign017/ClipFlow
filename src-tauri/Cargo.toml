@@ -1,0 +1,31 @@
+[package]
+name = "clipflow"
+version = "0.1.0"
+description = "ClipFlow - Windows Clipboard Manager"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "clipflow_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clipboard-win = "5.4.0"
+arboard = "3.4"
+image = "0.25.4"
+uuid = { version = "1", features = ["v4"] }
+chrono = "0.4"
+dirs = "5.0"
+parking_lot = "0.12"
+log = "0.4"
+env_logger = "0.11"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = ["Win32_System_DataExchange", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Memory"] }
