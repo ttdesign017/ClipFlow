@@ -2,6 +2,7 @@ use crate::storage::ClipboardCache;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use tauri::State;
+use tauri::Manager;
 
 #[tauri::command]
 pub fn get_clipboard_history(cache: State<Arc<Mutex<ClipboardCache>>>) -> Result<Vec<crate::clipboard::parser::ClipboardItem>, String> {
@@ -209,4 +210,13 @@ fn write_file_to_clipboard(file_path: &str) -> Result<(), String> {
 #[cfg(not(target_os = "windows"))]
 fn write_file_to_clipboard(_file_path: &str) -> Result<(), String> {
     Err("File clipboard is not supported on this platform".to_string())
+}
+
+#[tauri::command]
+pub async fn set_ignore_cursor_events(app: tauri::AppHandle, ignore: bool) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("main") {
+        win.set_ignore_cursor_events(ignore)
+            .map_err(|e| format!("Failed to set ignore cursor events: {}", e))?;
+    }
+    Ok(())
 }

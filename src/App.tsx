@@ -7,8 +7,6 @@ import { ClipboardItem } from './types';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
-const HIDE_DELAY = 150; // 鼠标离开窗口后延迟隐藏（毫秒）
-
 function App() {
   const [textItems, setTextItems] = useState<ClipboardItem[]>([]);
   const [imageItems, setImageItems] = useState<ClipboardItem[]>([]);
@@ -18,7 +16,9 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
 
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const isMouseInPanelRef = useRef(false);
+  const panelOpenRef = useRef(false);
 
   const loadHistory = async () => {
     try {
@@ -39,22 +39,40 @@ function App() {
     return () => { unlisten.then(fn => fn()); };
   }, []);
 
-  // 鼠标进入窗口 → 显示面板
-  const handleMouseEnter = useCallback(() => {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-    setPanelOpen(true);
+  // 监听全局鼠标位置事件（由 Rust 端的全局鼠标监控发出）
+  useEffect(() => {
+    const unlistenMouseAtTop = listen('mouse-at-top', () => {
+      if (!panelOpenRef.current) {
+        setPanelOpen(true);
+        panelOpenRef.current = true;
+      }
+    });
+
+    const unlistenMouseLeftWindow = listen('mouse-left-window', () => {
+      if (panelOpenRef.current) {
+        setPanelOpen(false);
+        panelOpenRef.current = false;
+      }
+    });
+
+    return () => {
+      unlistenMouseAtTop.then(fn => fn());
+      unlistenMouseLeftWindow.then(fn => fn());
+    };
   }, []);
 
-  // 鼠标离开窗口 → 延迟隐藏面板
-  const handleMouseLeave = useCallback(() => {
-    hideTimerRef.current = setTimeout(() => {
-      setPanelOpen(false);
-      hideTimerRef.current = null;
-    }, HIDE_DELAY);
-  }, []);
+  // 面板状态变化时，调用 Tauri API 设置窗口是否阻挡鼠标
+  useEffect(() => {
+    const setIgnoreCursorEvents = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('set_ignore_cursor_events', { ignore: !panelOpen });
+      } catch (e) {
+        console.log('set_ignore_cursor_events not available:', e);
+      }
+    };
+    setIgnoreCursorEvents();
+  }, [panelOpen]);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -97,18 +115,16 @@ function App() {
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
-      {/* 整个窗口容器：始终存在，mouseenter/mouseleave 控制显示 */}
-      <div
-        className="w-full h-full"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
+      {/* 整个窗口容器 */}
+      <div className="w-full h-full window-container">
         {/* 面板内容：translateY 控制滑入/滑出 */}
         <div
+          ref={panelRef}
           className="w-full h-full bg-white/90 backdrop-blur-md rounded-b-lg border border-gray-200/60 flex flex-col"
           style={{
             transform: panelOpen ? 'translateY(0)' : 'translateY(-100%)',
             transition: 'transform 0.25s cubic-bezier(0.4, 0.0, 0.2, 1)',
+            pointerEvents: panelOpen ? 'auto' : 'none',
           }}
         >
           {/* 顶部操作栏 */}

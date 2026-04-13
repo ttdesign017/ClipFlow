@@ -18,7 +18,7 @@
         "y": 0,
         "width": 800,
         "height": 400,
-        "resizable": true,
+        "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,

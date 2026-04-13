@@ -7,6 +7,7 @@ pub mod storage;
 pub mod tray;
 pub mod window;
 pub mod commands;
+pub mod mouse_monitor;
 
 use storage::ClipboardCache;
 
@@ -43,6 +44,9 @@ pub fn run() {
             println!("Setup: Tray icon created successfully");
 
             clipboard::start_listening(app.handle().clone());
+            
+            // 启动全局鼠标监控
+            mouse_monitor::start(app.handle().clone());
 
             println!("Setup: All initialization complete");
 
@@ -60,6 +64,7 @@ pub fn run() {
             commands::update_settings,
             commands::set_auto_start,
             commands::get_temp_image_path,
+            commands::set_ignore_cursor_events,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ClipFlow");
