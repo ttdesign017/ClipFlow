@@ -32,7 +32,6 @@ pub fn mark_skip_next_check() {
 /// 请求重置监听器状态（清空历史后调用）
 pub fn reset_listener_state() {
     let current_seq = get_clipboard_sequence() as usize;
-    println!("[Clipboard] Requesting reset, current sequence: {}", current_seq);
     RESET_SEQUENCE.store(current_seq, Ordering::SeqCst);
     RESET_REQUESTED.store(true, Ordering::SeqCst);
 }
@@ -52,7 +51,6 @@ pub fn start_listening(app: AppHandle) {
             // 检查是否需要重置状态
             if RESET_REQUESTED.swap(false, Ordering::SeqCst) {
                 let reset_seq = RESET_SEQUENCE.load(Ordering::SeqCst) as u32;
-                println!("[Clipboard] Resetting listener state, sequence at reset: {}", reset_seq);
                 seen_text_hashes.clear();
                 last_clipboard_sequence = Some(reset_seq);
                 // 关键修复：读取当前剪贴板文本并种下 hash，避免清空后立即重新拉取
@@ -69,9 +67,13 @@ pub fn start_listening(app: AppHandle) {
             let remaining = SKIP_CHECKS_REMAINING.load(Ordering::SeqCst);
             if remaining > 0 {
                 SKIP_CHECKS_REMAINING.store(remaining - 1, Ordering::SeqCst);
-                // 只更新哈希，不添加到缓存
+                // 在跳过期间也要读取并种下状态，避免跳过结束后被当作新内容重新添加
                 if let Some(text) = read_text_from_clipboard() {
                     last_text_hash = Some(hash_content(text.as_bytes()));
+                } else if clipboard_has_image_format() {
+                    // 如果有图片格式，也更新序列号
+                    let seq = get_clipboard_sequence();
+                    last_clipboard_sequence = Some(seq);
                 }
                 thread::sleep(POLL_INTERVAL);
                 continue;
@@ -87,7 +89,6 @@ pub fn start_listening(app: AppHandle) {
 
                     // 检查是否是新内容
                     if Some(current_hash) != last_text_hash && !seen_text_hashes.contains(&current_hash) {
-                        println!("[Clipboard] New text content detected, adding to cache (hash={})", current_hash);
                         last_text_hash = Some(current_hash);
                         seen_text_hashes.insert(current_hash);
 
@@ -106,8 +107,6 @@ pub fn start_listening(app: AppHandle) {
                         || Some(current_sequence) != last_clipboard_sequence;
 
                     if is_new_operation {
-                        println!("[Clipboard] New image operation detected (seq: {:?} -> {})",
-                            last_clipboard_sequence, current_sequence);
                         last_clipboard_sequence = Some(current_sequence);
 
                         let parsed = parse_image_content(image_data);
@@ -170,14 +169,13 @@ fn read_clipboard_once() -> Option<ClipboardRead> {
         // 只有确认有图片格式时才调用 arboard
         match try_read_image_from_clipboard() {
             Ok(Some(image_data)) => {
-                println!("[Clipboard] Image detected: {}x{}", image_data.width, image_data.height);
                 return Some(ClipboardRead::Image(image_data));
             }
             Ok(None) => {
-                println!("[Clipboard] Clipboard has image format but read returned None");
+                // 有图片格式但读取返回 None
             }
             Err(e) => {
-                println!("[Clipboard] Image read error: {}", e);
+                // 图片读取失败
             }
         }
     }
@@ -192,7 +190,6 @@ fn read_text_from_clipboard() -> Option<String> {
     match get_clipboard::<String, _>(formats::Unicode) {
         Ok(text) => {
             if !text.is_empty() {
-                println!("[Clipboard] Text read success: {} chars", text.len());
                 Some(text)
             } else {
                 None
@@ -213,8 +210,6 @@ fn try_read_image_from_clipboard() -> Result<Option<arboard::ImageData<'static>>
             match clipboard.get_image() {
                 Ok(image_data) => {
                     if image_data.width > 0 && image_data.height > 0 && !image_data.bytes.is_empty() {
-                        println!("[Clipboard] Image read success: {}x{}, {} bytes",
-                            image_data.width, image_data.height, image_data.bytes.len());
                         Ok(Some(image_data.to_owned_img()))
                     } else {
                         Err("Invalid image dimensions".to_string())
@@ -232,13 +227,6 @@ fn try_read_image_from_clipboard() -> Result<Option<arboard::ImageData<'static>>
 }
 
 fn add_to_cache_and_notify(app_handle: &AppHandle, item: ClipboardItem) {
-    println!("[Clipboard] Adding item: {} (type={})", item.preview,
-        match &item.kind {
-            ItemType::Text { .. } => "Text",
-            ItemType::Image { .. } => "Image",
-            ItemType::File { .. } => "File",
-        }
-    );
     app_handle.state::<Arc<Mutex<ClipboardCache>>>().lock().add_item(item);
     if let Some(window) = app_handle.get_webview_window("main") {
         let _ = window.emit("clipboard-updated", ());

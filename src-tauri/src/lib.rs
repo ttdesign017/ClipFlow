@@ -65,6 +65,9 @@ pub fn run() {
             commands::set_auto_start,
             commands::get_temp_image_path,
             commands::set_ignore_cursor_events,
+            commands::delete_clipboard_item,
+            commands::pin_clipboard_item,
+            commands::copy_image_to_clipboard,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ClipFlow");

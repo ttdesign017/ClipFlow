@@ -96,6 +96,52 @@ pub fn get_temp_image_path(cache: State<Arc<Mutex<ClipboardCache>>>) -> Result<S
     Ok(temp_dir.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+pub fn delete_clipboard_item(id: String, cache: State<Arc<Mutex<ClipboardCache>>>) -> Result<(), String> {
+    let mut cache_lock = cache.lock();
+    if cache_lock.delete_item(&id) {
+        Ok(())
+    } else {
+        Err("Item not found".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn pin_clipboard_item(id: String, cache: State<Arc<Mutex<ClipboardCache>>>) -> Result<(), String> {
+    let mut cache_lock = cache.lock();
+    if cache_lock.pin_item(&id) {
+        Ok(())
+    } else {
+        Err("Item not found".to_string())
+    }
+}
+
+/// 复制图片到剪贴板（通过文件路径）
+#[tauri::command]
+pub fn copy_image_to_clipboard(file_path: String) -> Result<(), String> {
+    // 标记跳过接下来的 N 次检测
+    crate::clipboard::listener::mark_skip_next_check();
+    
+    // 读取图片文件
+    let image = image::open(&file_path)
+        .map_err(|e| format!("Failed to open image: {}", e))?;
+    
+    let width = image.width() as u32;
+    let height = image.height() as u32;
+    let rgba = image.to_rgba8();
+    
+    // 转换为 BGR（DIB 格式需要 BGR，不包含 alpha）
+    let mut bgr_data: Vec<u8> = Vec::with_capacity((width * height * 4) as usize);
+    for pixel in rgba.chunks(4) {
+        bgr_data.push(pixel[2]); // B
+        bgr_data.push(pixel[1]); // G
+        bgr_data.push(pixel[0]); // R
+        bgr_data.push(0);        // 填充字节
+    }
+    
+    write_dib_to_clipboard(width, height, bgr_data)
+}
+
 // Windows 注册表操作：开机自启
 fn is_auto_start_enabled() -> bool {
     use std::process::Command;
@@ -196,6 +242,80 @@ fn write_file_to_clipboard(file_path: &str) -> Result<(), String> {
         if OpenClipboard(HWND(std::ptr::null_mut())).is_ok() {
             let _ = EmptyClipboard();
             let result = SetClipboardData(CF_HDROP, HANDLE(h_mem.0 as _));
+            let _ = CloseClipboard();
+
+            result.map_err(|e| format!("Failed to set clipboard data: {}", e))?;
+        } else {
+            return Err("Failed to open clipboard".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+/// Windows 平台：将位图数据以 CF_DIB 格式写入剪贴板
+#[cfg(target_os = "windows")]
+fn write_dib_to_clipboard(width: u32, height: u32, bgr_data: Vec<u8>) -> Result<(), String> {
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Gdi::BITMAPINFOHEADER;
+    use windows::Win32::Graphics::Gdi::BI_RGB;
+    use windows::Win32::System::DataExchange::{
+        CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+    };
+    use windows::Win32::System::Memory::{
+        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE, GMEM_ZEROINIT,
+    };
+
+    // CF_DIB 格式 ID
+    const CF_DIB: u32 = 8;
+
+    // BITMAPINFOHEADER 大小（40 字节）
+    const HEADER_SIZE: usize = 40;
+
+    // 行大小（4 字节对齐）
+    let row_size = ((width * 4 + 3) / 4) * 4;
+    let image_size = (row_size * height) as usize;
+
+    // 总内存大小：header + pixel data
+    let total_size = HEADER_SIZE + image_size;
+
+    let h_mem = unsafe { GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, total_size) }
+        .map_err(|e| format!("Failed to allocate global memory: {}", e))?;
+
+    unsafe {
+        let mem_ptr = GlobalLock(h_mem);
+        if mem_ptr.is_null() {
+            return Err("Failed to lock global memory".to_string());
+        }
+        let mem_ptr = mem_ptr as *mut u8;
+
+        // 写入 BITMAPINFOHEADER
+        let header = &mut *(mem_ptr as *mut BITMAPINFOHEADER);
+        header.biSize = HEADER_SIZE as u32;
+        header.biWidth = width as i32;
+        header.biHeight = height as i32; // 正数 = 自底向上
+        header.biPlanes = 1;
+        header.biBitCount = 32;
+        header.biCompression = BI_RGB.0;
+        header.biSizeImage = image_size as u32;
+
+        // 写入像素数据（需要垂直翻转，因为 DIB 是自底向上）
+        let pixel_start = mem_ptr.add(HEADER_SIZE);
+        for y in 0..height {
+            let src_row = bgr_data.chunks(4).skip(((height - 1 - y) * width) as usize).take(width as usize);
+            let dst_row = pixel_start.offset((y * row_size) as isize) as *mut u8;
+            for (i, pixel) in src_row.enumerate() {
+                std::ptr::copy_nonoverlapping(pixel.as_ptr(), dst_row.add(i * 4), 4);
+            }
+        }
+
+        GlobalUnlock(h_mem).ok();
+
+        // 打开剪贴板
+        if OpenClipboard(HWND(std::ptr::null_mut())).is_ok() {
+            let _ = EmptyClipboard();
+            let result = SetClipboardData(CF_DIB, HANDLE(h_mem.0 as _));
             let _ = CloseClipboard();
 
             result.map_err(|e| format!("Failed to set clipboard data: {}", e))?;

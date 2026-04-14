@@ -57,6 +57,28 @@ impl SingleTypeCache {
     fn get_temp_dir(&self) -> &PathBuf {
         &self.temp_dir
     }
+
+    /// 删除指定 ID 的条目
+    fn delete_item(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.items.iter().position(|item| item.id == id) {
+            if let Some(item) = self.items.remove(pos) {
+                self.cleanup_item(&item);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// 置顶指定 ID 的条目（移动到末尾，即最新位置）
+    fn pin_item(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.items.iter().position(|item| item.id == id) {
+            if let Some(item) = self.items.remove(pos) {
+                self.items.push_back(item);
+                return true;
+            }
+        }
+        false
+    }
 }
 
 /// 剪贴板缓存：文字和图片各自独立
@@ -119,6 +141,18 @@ impl ClipboardCache {
 
     pub fn get_temp_dir(&self) -> &PathBuf {
         self.text_cache.get_temp_dir()
+    }
+
+    /// 删除指定 ID 的条目
+    pub fn delete_item(&mut self, id: &str) -> bool {
+        // 先尝试从文字缓存删除，如果失败则尝试图片缓存
+        self.text_cache.delete_item(id) || self.image_cache.delete_item(id)
+    }
+
+    /// 置顶指定 ID 的条目
+    pub fn pin_item(&mut self, id: &str) -> bool {
+        // 先尝试从文字缓存置顶，如果失败则尝试图片缓存
+        self.text_cache.pin_item(id) || self.image_cache.pin_item(id)
     }
 }
 

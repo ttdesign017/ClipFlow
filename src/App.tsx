@@ -6,6 +6,7 @@ import Settings from './components/Settings';
 import { ClipboardItem } from './types';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { ClipboardIcon as _ClipboardIcon, SettingsIcon, TrashIcon } from './components/Icons';
 
 function App() {
   const [textItems, setTextItems] = useState<ClipboardItem[]>([]);
@@ -90,6 +91,34 @@ function App() {
     catch (error) { console.error('Failed to copy:', error); }
   };
 
+  const handleCopyImageToClipboard = async (path: string) => {
+    try { await invoke('copy_image_to_clipboard', { filePath: path }); }
+    catch (error) { console.error('Failed to copy image:', error); }
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    try {
+      await invoke('delete_clipboard_item', { id });
+      // 直接从 state 中移除，实现即时更新
+      setTextItems(prev => prev.filter(item => item.id !== id));
+      setFilteredTextItems(prev => prev.filter(item => item.id !== id));
+      setImageItems(prev => prev.filter(item => item.id !== id));
+      setFilteredImageItems(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Failed to delete item:', error);
+    }
+  };
+
+  const handlePinItem = async (id: string) => {
+    try {
+      await invoke('pin_clipboard_item', { id });
+      // 重新加载历史以获取排序后的结果
+      loadHistory();
+    } catch (error) {
+      console.error('Failed to pin item:', error);
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active } = event;
     const data = active.data.current;
@@ -129,11 +158,6 @@ function App() {
         >
           {/* 顶部操作栏 */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">📋</span>
-              <h1 className="text-lg font-semibold text-gray-800">ClipFlow</h1>
-            </div>
-
             <SearchBar value={searchQuery} onChange={setSearchQuery} />
 
             <div className="flex items-center gap-2">
@@ -142,14 +166,14 @@ function App() {
                 className="p-2 hover:bg-gray-200/50 rounded-lg transition-colors"
                 title="设置"
               >
-                ⚙️
+                <SettingsIcon className="w-5 h-5 text-gray-600" />
               </button>
               <button
                 onClick={handleClearHistory}
                 className="p-2 hover:bg-gray-200/50 rounded-lg transition-colors"
                 title="清空历史"
               >
-                🗑️
+                <TrashIcon className="w-5 h-5 text-gray-600" />
               </button>
             </div>
           </div>
@@ -163,6 +187,9 @@ function App() {
               textItems={filteredTextItems}
               imageItems={filteredImageItems}
               onCopy={handleCopyToClipboard}
+              onCopyImage={handleCopyImageToClipboard}
+              onDelete={handleDeleteItem}
+              onPin={handlePinItem}
             />
           </div>
         </div>

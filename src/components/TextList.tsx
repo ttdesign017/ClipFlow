@@ -4,9 +4,11 @@ import ClipboardCard from './ClipboardCard';
 interface TextListProps {
   items: ClipboardItem[];
   onCopy: (content: string) => void;
+  onDelete?: (id: string) => void;
+  onPin?: (id: string) => void;
 }
 
-export default function TextList({ items, onCopy }: TextListProps) {
+export default function TextList({ items, onCopy, onDelete, onPin }: TextListProps) {
   if (items.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
@@ -18,7 +20,7 @@ export default function TextList({ items, onCopy }: TextListProps) {
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <ClipboardCard key={item.id} item={item} onCopy={onCopy} />
+        <ClipboardCard key={item.id} item={item} onCopy={onCopy} onDelete={onDelete} onPin={onPin} />
       ))}
     </div>
   );
