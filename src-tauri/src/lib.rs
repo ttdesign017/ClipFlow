@@ -67,6 +67,7 @@ pub fn run() {
             commands::set_ignore_cursor_events,
             commands::delete_clipboard_item,
             commands::pin_clipboard_item,
+            commands::unpin_clipboard_item,
             commands::copy_image_to_clipboard,
         ])
         .run(tauri::generate_context!())

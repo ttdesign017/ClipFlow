@@ -10,7 +10,7 @@ interface ClipboardCardProps {
   item: ClipboardItem;
   onCopy: (content: string) => void;
   onDelete?: (id: string) => void;
-  onPin?: (id: string) => void;
+  onTogglePin?: (id: string, pinned: boolean) => void;
 }
 
 // 简单的 markdown 样式配置
@@ -33,7 +33,7 @@ const markdownComponents = {
   img: ({ children, ...props }: any) => <img className="max-w-full h-auto rounded" {...props}>{children}</img>,
 };
 
-export default function ClipboardCard({ item, onCopy, onDelete, onPin }: ClipboardCardProps) {
+export default function ClipboardCard({ item, onCopy, onDelete, onTogglePin }: ClipboardCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: item.id,
     data: {
@@ -64,8 +64,8 @@ export default function ClipboardCard({ item, onCopy, onDelete, onPin }: Clipboa
 
   const handlePinClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    onPin?.(item.id);
-  }, [item.id, onPin]);
+    onTogglePin?.(item.id, item.pinned);
+  }, [item.id, item.pinned, onTogglePin]);
 
   // 检测是否是 markdown 格式（包含 # 或 * 或 ``` 等标记）
   const isMarkdown = useMemo(() => {
@@ -117,19 +117,17 @@ export default function ClipboardCard({ item, onCopy, onDelete, onPin }: Clipboa
           </div>
         )}
         
-        {/* 展开/收起按钮 */}
-        {needsExpand && !isMarkdown && (
-          <button 
-            className="text-xs text-blue-500 hover:text-blue-600 mt-1"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            {isExpanded ? '收起' : '展开'}
-          </button>
-        )}
-
-        {/* 底部时间 */}
-        <div className="flex items-center justify-end mt-1">
-          <span className="text-xs text-gray-400">{formatTime(item.timestamp)}</span>
+        {/* 底部区域：展开按钮 + 时间 */}
+        <div className="flex items-center justify-between mt-1">
+          {needsExpand && !isMarkdown && (
+            <button
+              className="text-xs text-blue-500 hover:text-blue-600"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? '收起' : '展开'}
+            </button>
+          )}
+          <span className="text-xs text-gray-400 ml-auto">{formatTime(item.timestamp)}</span>
         </div>
       </div>
 
@@ -137,21 +135,21 @@ export default function ClipboardCard({ item, onCopy, onDelete, onPin }: Clipboa
       <div className="absolute top-1 right-1.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-30">
         <button
           onClick={handlePinClick}
-          className="p-1 bg-white hover:bg-gray-50 rounded transition-colors shadow-md"
+          className="p-1 bg-white hover:bg-gray-50 rounded transition-all shadow-md active:scale-90"
           title="置顶"
         >
-          <PinIcon className="w-3.5 h-3.5 text-gray-600" />
+          <PinIcon className="w-3.5 h-3.5 text-gray-600" pinned={item.pinned} />
         </button>
         <button
           onClick={handleDeleteClick}
-          className="p-1 bg-white hover:bg-red-50 rounded transition-colors shadow-md"
+          className="p-1 bg-white hover:bg-red-50 rounded transition-all shadow-md active:scale-90"
           title="删除"
         >
           <DeleteIcon className="w-3.5 h-3.5 text-gray-600 hover:text-red-600" />
         </button>
         <button
           onClick={handleCopyClick}
-          className="p-1 bg-white hover:bg-gray-50 rounded transition-colors shadow-md"
+          className="p-1 bg-white hover:bg-gray-50 rounded transition-all shadow-md active:scale-90"
           title="复制"
         >
           <CopyIcon className="w-3.5 h-3.5 text-gray-600" />

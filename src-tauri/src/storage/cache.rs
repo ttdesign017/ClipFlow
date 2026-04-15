@@ -7,6 +7,7 @@ struct SingleTypeCache {
     items: VecDeque<ClipboardItem>,
     max_items: usize,
     temp_dir: PathBuf,
+    sorted_cache: Option<Vec<ClipboardItem>>,
 }
 
 impl SingleTypeCache {
@@ -18,6 +19,7 @@ impl SingleTypeCache {
             items: VecDeque::with_capacity(max_items),
             max_items,
             temp_dir,
+            sorted_cache: None,
         }
     }
 
@@ -28,6 +30,7 @@ impl SingleTypeCache {
             }
         }
         self.items.push_back(item);
+        self.sorted_cache = None; // invalidate cache
     }
 
     fn get_items(&self) -> Vec<ClipboardItem> {
@@ -39,10 +42,26 @@ impl SingleTypeCache {
         for item in items {
             self.cleanup_item(&item);
         }
+        self.sorted_cache = None;
     }
 
     fn get_all_items(&self) -> Vec<ClipboardItem> {
         self.items.iter().cloned().collect()
+    }
+
+    /// 获取排序后的缓存条目（只排序一次，结果缓存）
+    fn get_sorted_items(&mut self) -> Vec<ClipboardItem> {
+        if let Some(ref cached) = self.sorted_cache {
+            return cached.clone();
+        }
+        let items = self.items.iter().cloned().collect::<Vec<_>>();
+        let mut pinned: Vec<_> = items.iter().filter(|i| i.pinned).cloned().collect();
+        let mut unpinned: Vec<_> = items.into_iter().filter(|i| !i.pinned).collect();
+        pinned.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        unpinned.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        let result: Vec<_> = pinned.into_iter().chain(unpinned).collect();
+        self.sorted_cache = Some(result.clone());
+        result
     }
 
     fn cleanup_item(&self, item: &ClipboardItem) {
@@ -63,19 +82,29 @@ impl SingleTypeCache {
         if let Some(pos) = self.items.iter().position(|item| item.id == id) {
             if let Some(item) = self.items.remove(pos) {
                 self.cleanup_item(&item);
+                self.sorted_cache = None; // invalidate cache
                 return true;
             }
         }
         false
     }
 
-    /// 置顶指定 ID 的条目（移动到末尾，即最新位置）
+    /// 置顶指定 ID 的条目
     fn pin_item(&mut self, id: &str) -> bool {
-        if let Some(pos) = self.items.iter().position(|item| item.id == id) {
-            if let Some(item) = self.items.remove(pos) {
-                self.items.push_back(item);
-                return true;
-            }
+        if let Some(item) = self.items.iter_mut().find(|item| item.id == id) {
+            item.pinned = true;
+            self.sorted_cache = None; // invalidate cache
+            return true;
+        }
+        false
+    }
+
+    /// 取消置顶指定 ID 的条目
+    fn unpin_item(&mut self, id: &str) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|item| item.id == id) {
+            item.pinned = false;
+            self.sorted_cache = None; // invalidate cache
+            return true;
         }
         false
     }
@@ -104,14 +133,14 @@ impl ClipboardCache {
         }
     }
 
-    /// 获取文字历史
-    pub fn get_text_items(&self) -> Vec<ClipboardItem> {
-        self.text_cache.get_items()
+    /// 获取文字历史（已排序）
+    pub fn get_text_items(&mut self) -> Vec<ClipboardItem> {
+        self.text_cache.get_sorted_items()
     }
 
-    /// 获取图片历史
-    pub fn get_image_items(&self) -> Vec<ClipboardItem> {
-        self.image_cache.get_items()
+    /// 获取图片历史（已排序）
+    pub fn get_image_items(&mut self) -> Vec<ClipboardItem> {
+        self.image_cache.get_sorted_items()
     }
 
     /// 获取所有历史（合并，用于兼容旧接口）
@@ -153,6 +182,12 @@ impl ClipboardCache {
     pub fn pin_item(&mut self, id: &str) -> bool {
         // 先尝试从文字缓存置顶，如果失败则尝试图片缓存
         self.text_cache.pin_item(id) || self.image_cache.pin_item(id)
+    }
+
+    /// 取消置顶指定 ID 的条目
+    pub fn unpin_item(&mut self, id: &str) -> bool {
+        // 先尝试从文字缓存取消置顶，如果失败则尝试图片缓存
+        self.text_cache.unpin_item(id) || self.image_cache.unpin_item(id)
     }
 }
 

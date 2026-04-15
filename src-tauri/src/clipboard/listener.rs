@@ -92,9 +92,13 @@ pub fn start_listening(app: AppHandle) {
                         last_text_hash = Some(current_hash);
                         seen_text_hashes.insert(current_hash);
 
-                        // 限制 seen_text_hashes 大小
-                        if seen_text_hashes.len() > 20 {
-                            seen_text_hashes.clear();
+                        // 限制 seen_text_hashes 大小，超出时移除最早的一半
+                        if seen_text_hashes.len() > 50 {
+                            // 移除最早的 25 个，保留较新的 25 个
+                            let to_remove: Vec<_> = seen_text_hashes.iter().take(25).cloned().collect();
+                            for h in to_remove {
+                                seen_text_hashes.remove(&h);
+                            }
                         }
 
                         let parsed = parse_clipboard_content(data);

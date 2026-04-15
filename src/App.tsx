@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { DndContext, DragEndEvent } from '@dnd-kit/core';
 import DockPanel from './components/DockPanel';
 import SearchBar from './components/SearchBar';
-import Settings from './components/Settings';
+import SettingsDropdown from './components/Settings';
 import { ClipboardItem } from './types';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -20,6 +20,7 @@ function App() {
   const panelRef = useRef<HTMLDivElement>(null);
   const isMouseInPanelRef = useRef(false);
   const panelOpenRef = useRef(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadHistory = async () => {
     try {
@@ -99,7 +100,7 @@ function App() {
   const handleDeleteItem = async (id: string) => {
     try {
       await invoke('delete_clipboard_item', { id });
-      // 直接从 state 中移除，实现即时更新
+      // 直接从 state 中移除，实现即时更新，无需重新加载
       setTextItems(prev => prev.filter(item => item.id !== id));
       setFilteredTextItems(prev => prev.filter(item => item.id !== id));
       setImageItems(prev => prev.filter(item => item.id !== id));
@@ -109,13 +110,17 @@ function App() {
     }
   };
 
-  const handlePinItem = async (id: string) => {
+  const handleTogglePin = async (id: string, pinned: boolean) => {
     try {
-      await invoke('pin_clipboard_item', { id });
+      if (pinned) {
+        await invoke('unpin_clipboard_item', { id });
+      } else {
+        await invoke('pin_clipboard_item', { id });
+      }
       // 重新加载历史以获取排序后的结果
       loadHistory();
     } catch (error) {
-      console.error('Failed to pin item:', error);
+      console.error('Failed to toggle pin:', error);
     }
   };
 
@@ -142,6 +147,16 @@ function App() {
     }
   };
 
+  // 防抖搜索
+  const handleSearchChange = useCallback((query: string) => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchQuery(query);
+    }, 300);
+  }, []);
+
   return (
     <DndContext onDragEnd={handleDragEnd}>
       {/* 整个窗口容器 */}
@@ -158,16 +173,25 @@ function App() {
         >
           {/* 顶部操作栏 */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 flex-shrink-0">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            <SearchBar value={searchQuery} onChange={handleSearchChange} />
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="p-2 hover:bg-gray-200/50 rounded-lg transition-colors"
-                title="设置"
-              >
-                <SettingsIcon className="w-5 h-5 text-gray-600" />
-              </button>
+            <div className="flex items-center gap-2 relative">
+              <div className="relative">
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowSettings(!showSettings);
+                  }}
+                  className="p-2 hover:bg-gray-200/50 rounded-lg transition-colors"
+                  title="设置"
+                >
+                  <SettingsIcon className="w-5 h-5 text-gray-600" />
+                </button>
+                {showSettings && (
+                  <SettingsDropdown onClose={() => setShowSettings(false)} />
+                )}
+              </div>
               <button
                 onClick={handleClearHistory}
                 className="p-2 hover:bg-gray-200/50 rounded-lg transition-colors"
@@ -178,9 +202,6 @@ function App() {
             </div>
           </div>
 
-          {/* 设置面板 */}
-          {showSettings && <Settings onClose={() => setShowSettings(false)} />}
-
           {/* 主内容区域 */}
           <div className="flex-1 overflow-hidden">
             <DockPanel
@@ -189,7 +210,7 @@ function App() {
               onCopy={handleCopyToClipboard}
               onCopyImage={handleCopyImageToClipboard}
               onDelete={handleDeleteItem}
-              onPin={handlePinItem}
+              onTogglePin={handleTogglePin}
             />
           </div>
         </div>

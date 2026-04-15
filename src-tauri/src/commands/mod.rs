@@ -116,6 +116,16 @@ pub fn pin_clipboard_item(id: String, cache: State<Arc<Mutex<ClipboardCache>>>) 
     }
 }
 
+#[tauri::command]
+pub fn unpin_clipboard_item(id: String, cache: State<Arc<Mutex<ClipboardCache>>>) -> Result<(), String> {
+    let mut cache_lock = cache.lock();
+    if cache_lock.unpin_item(&id) {
+        Ok(())
+    } else {
+        Err("Item not found".to_string())
+    }
+}
+
 /// 复制图片到剪贴板（通过文件路径）
 #[tauri::command]
 pub fn copy_image_to_clipboard(file_path: String) -> Result<(), String> {

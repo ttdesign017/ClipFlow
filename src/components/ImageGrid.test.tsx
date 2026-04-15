@@ -25,12 +25,14 @@ describe('ImageGrid', () => {
       kind: { Image: { path: '/temp/ClipFlow/images/img-1.png', width: 1920, height: 1080 } },
       timestamp: Date.now() - 5 * 60 * 1000,
       preview: '图片 1920x1080',
+      pinned: false,
     },
     {
       id: 'img-2',
       kind: { Image: { path: '/temp/ClipFlow/images/img-2.png', width: 800, height: 600 } },
       timestamp: Date.now() - 10 * 60 * 1000,
       preview: '图片 800x600',
+      pinned: false,
     },
   ];
 
@@ -81,6 +83,7 @@ describe('ImageGrid', () => {
       kind: { Image: { path: '', width: 640, height: 480 } },
       timestamp: Date.now(),
       preview: '图片 640x480',
+      pinned: false,
     };
 
     render(<ImageGrid items={[imageWithNoPath]} />);

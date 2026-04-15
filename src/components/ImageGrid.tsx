@@ -7,11 +7,11 @@ import { CopyIcon, DeleteIcon, PinIcon, GripIcon } from './Icons';
 interface ImageGridProps {
   items: ClipboardItem[];
   onDelete?: (id: string) => void;
-  onPin?: (id: string) => void;
+  onTogglePin?: (id: string, pinned: boolean) => void;
   onCopyImage?: (path: string) => void;
 }
 
-function ImageCard({ item, onDelete, onPin, onCopyImage }: { item: ClipboardItem; onDelete?: (id: string) => void; onPin?: (id: string) => void; onCopyImage?: (path: string) => void }) {
+function ImageCard({ item, onDelete, onTogglePin, onCopyImage }: { item: ClipboardItem; onDelete?: (id: string) => void; onTogglePin?: (id: string, pinned: boolean) => void; onCopyImage?: (path: string) => void }) {
   if (!('Image' in item.kind)) return null;
 
   const { path, width, height } = item.kind.Image;
@@ -38,7 +38,7 @@ function ImageCard({ item, onDelete, onPin, onCopyImage }: { item: ClipboardItem
 
   const handlePinClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onPin?.(item.id);
+    onTogglePin?.(item.id, item.pinned);
   };
 
   const handleCopyClick = (e: React.MouseEvent) => {
@@ -67,21 +67,21 @@ function ImageCard({ item, onDelete, onPin, onCopyImage }: { item: ClipboardItem
       <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
         <button
           onClick={handlePinClick}
-          className="p-1 bg-white hover:bg-gray-50 rounded transition-colors shadow-md"
+          className="p-1 bg-white hover:bg-gray-50 rounded transition-all shadow-md active:scale-90"
           title="置顶"
         >
-          <PinIcon className="w-3.5 h-3.5 text-gray-600" />
+          <PinIcon className="w-3.5 h-3.5 text-gray-600" pinned={item.pinned} />
         </button>
         <button
           onClick={handleDeleteClick}
-          className="p-1 bg-white hover:bg-red-50 rounded transition-colors shadow-md"
+          className="p-1 bg-white hover:bg-red-50 rounded transition-all shadow-md active:scale-90"
           title="删除"
         >
           <DeleteIcon className="w-3.5 h-3.5 text-gray-600 hover:text-red-600" />
         </button>
         <button
           onClick={handleCopyClick}
-          className="p-1 bg-white hover:bg-gray-50 rounded transition-colors shadow-md"
+          className="p-1 bg-white hover:bg-gray-50 rounded transition-all shadow-md active:scale-90"
           title="复制图片"
         >
           <CopyIcon className="w-3.5 h-3.5 text-gray-600" />
@@ -112,7 +112,7 @@ function ImageCard({ item, onDelete, onPin, onCopyImage }: { item: ClipboardItem
   );
 }
 
-export default function ImageGrid({ items, onDelete, onPin, onCopyImage }: ImageGridProps) {
+export default function ImageGrid({ items, onDelete, onTogglePin, onCopyImage }: ImageGridProps) {
   if (items.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
@@ -124,7 +124,7 @@ export default function ImageGrid({ items, onDelete, onPin, onCopyImage }: Image
   return (
     <div className="grid grid-cols-2 gap-3">
       {items.map((item) => (
-        <ImageCard key={item.id} item={item} onDelete={onDelete} onPin={onPin} onCopyImage={onCopyImage} />
+        <ImageCard key={item.id} item={item} onDelete={onDelete} onTogglePin={onTogglePin} onCopyImage={onCopyImage} />
       ))}
     </div>
   );

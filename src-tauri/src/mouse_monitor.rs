@@ -55,8 +55,13 @@ pub fn start(app_handle: tauri::AppHandle) {
                         in_window = px >= left && px <= right && py >= top && py <= bottom;
                     }
 
-                    // 触碰顶端 → 触发
-                    if is_at_top && !was_at_top {
+                    // 触碰顶端且在面板水平范围内 → 触发
+                    let in_panel_x = if let Some((left, _top, right, _bottom)) = window_rect {
+                        point.x >= left && point.x <= right
+                    } else {
+                        false
+                    };
+                    if is_at_top && in_panel_x && !was_at_top {
                         let _ = app_handle.emit("mouse-at-top", &());
                         was_at_top = true;
                     } else if !is_at_top {

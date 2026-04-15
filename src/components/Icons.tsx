@@ -26,7 +26,16 @@ export function DeleteIcon({ className = "w-4 h-4" }: IconProps) {
 export function PinIcon({ className = "w-4 h-4", pinned = false }: IconProps & { pinned?: boolean }) {
   // Lucide pin - 经典倾斜图钉，极简线条样式
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill={pinned ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={pinned ? { color: '#f59e0b' } : undefined}
+    >
       <path d="M12 17v5" />
       <path d="M9 2h6l-1 7h2l-4 8-4-8h2z" />
     </svg>

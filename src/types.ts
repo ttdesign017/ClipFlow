@@ -3,6 +3,7 @@ export interface ClipboardItem {
   kind: ItemType;
   timestamp: number;
   preview: string;
+  pinned: boolean;
 }
 
 export type ItemType = 

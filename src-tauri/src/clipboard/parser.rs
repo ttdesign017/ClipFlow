@@ -8,6 +8,7 @@ pub struct ClipboardItem {
     pub kind: ItemType,
     pub timestamp: u64,
     pub preview: String,
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -35,6 +36,7 @@ pub fn parse_clipboard_content(data: Vec<u8>) -> ClipboardItem {
         },
         timestamp: Utc::now().timestamp_millis() as u64,
         preview,
+        pinned: false,
     }
 }
 
@@ -64,6 +66,7 @@ pub fn parse_image_content(image_data: ImageData<'static>) -> ClipboardItem {
         kind: ItemType::Image { path, width, height },
         timestamp: Utc::now().timestamp_millis() as u64,
         preview,
+        pinned: false,
     }
 }
 

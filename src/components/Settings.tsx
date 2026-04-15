@@ -1,17 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { SettingsIcon } from './Icons';
 
-interface SettingsProps {
+interface SettingsDropdownProps {
   onClose: () => void;
 }
 
-export default function Settings({ onClose }: SettingsProps) {
+export default function SettingsDropdown({ onClose }: SettingsDropdownProps) {
   const [maxItems, setMaxItems] = useState(50);
   const [autoStart, setAutoStart] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
 
   const loadSettings = async () => {
     try {
@@ -33,50 +45,41 @@ export default function Settings({ onClose }: SettingsProps) {
   };
 
   return (
-    <div className="p-4 bg-gray-100/90 border-b border-gray-200/60 animate-fade-in">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">设置</h2>
+    <div
+      ref={dropdownRef}
+      className="absolute top-full right-0 mt-1 w-56 bg-white/95 backdrop-blur-md rounded-lg shadow-lg border border-gray-200/60 py-1.5 z-50"
+    >
+      {/* 开机自启 */}
+      <div className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-100/50 transition-colors">
+        <span className="text-sm text-gray-700">开机自启</span>
         <button
-          onClick={onClose}
-          className="p-1 hover:bg-gray-200/50 rounded transition-colors text-gray-600"
+          onClick={() => handleAutoStartToggle(!autoStart)}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+            autoStart ? 'bg-blue-500' : 'bg-gray-300'
+          }`}
         >
-          ✕
+          <span
+            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+              autoStart ? 'translate-x-5' : 'translate-x-1'
+            }`}
+          />
         </button>
       </div>
 
-      <div className="space-y-4">
-        {/* 最大保留条数 */}
-        <div>
-          <label className="block text-sm text-gray-600 mb-2">
-            最大保留条数
-          </label>
-          <input
-            type="range"
-            min="10"
-            max="200"
-            value={maxItems}
-            onChange={(e) => setMaxItems(Number(e.target.value))}
-            className="w-full"
-          />
-          <div className="text-xs text-gray-400 mt-1">{maxItems} 条</div>
+      {/* 最大保留条数 */}
+      <div className="px-3 py-1.5 hover:bg-gray-100/50 transition-colors">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm text-gray-700">最大保留</span>
+          <span className="text-xs text-gray-400">{maxItems} 条</span>
         </div>
-
-        {/* 开机自启 */}
-        <div className="flex items-center justify-between">
-          <label className="text-sm text-gray-600">开机自启</label>
-          <button
-            onClick={() => handleAutoStartToggle(!autoStart)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              autoStart ? 'bg-blue-500' : 'bg-gray-300'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                autoStart ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
+        <input
+          type="range"
+          min="10"
+          max="200"
+          value={maxItems}
+          onChange={(e) => setMaxItems(Number(e.target.value))}
+          className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+        />
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ describe('ClipboardCard', () => {
     kind: { Text: { content: 'Hello, this is a test clipboard item!' } },
     timestamp: Date.now() - 5 * 60 * 1000,
     preview: 'Hello, this is a test clipboard item!',
+    pinned: false,
   };
 
   const mockImageItem: ClipboardItem = {
@@ -28,6 +29,7 @@ describe('ClipboardCard', () => {
     kind: { Image: { path: '/test/path.png', width: 1920, height: 1080 } },
     timestamp: Date.now() - 10 * 60 * 1000,
     preview: '图片 1920x1080',
+    pinned: false,
   };
 
   const mockOnCopy = vi.fn();
